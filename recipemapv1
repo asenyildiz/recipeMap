@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yemek Haritam</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: wide map on top, ranked country list left, dish detail right. */
+:root{
+  --bg:#f2f5f2; --fg:#1b2420; --muted:#5d6a63; --line:#d3dbd4; --panel:#e9eee9;
+  --land:#dbe2dc; --s1:#f4d08f; --s2:#e9a65a; --s3:#d9743a; --s4:#b9441f; --s5:#7d2412; --sel:#1b2420;
+  --display:'Bricolage Grotesque',system-ui,sans-serif; --body:'IBM Plex Sans',system-ui,sans-serif; --mono:'IBM Plex Mono',ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#121715; --fg:#e6ece7; --muted:#93a198; --line:#2b3531; --panel:#1a211e;
+  --land:#27302c; --s1:#6b5430; --s2:#a8692f; --s3:#d4793a; --s4:#ec9a52; --s5:#ffc27d; --sel:#e6ece7; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#121715; --fg:#e6ece7; --muted:#93a198; --line:#2b3531; --panel:#1a211e;
+  --land:#27302c; --s1:#6b5430; --s2:#a8692f; --s3:#d4793a; --s4:#ec9a52; --s5:#ffc27d; --sel:#e6ece7; color-scheme:dark}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);padding-inline:16px;padding-block:28px 40px;line-height:1.5}
+.wrap{max-width:1100px;margin-inline:auto;display:flex;flex-direction:column;gap:24px}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(2rem,6vw,3.4rem);line-height:1.02;margin:0;text-wrap:balance;letter-spacing:-.02em}
+.sub{color:var(--muted);max-width:62ch;margin:8px 0 0;font-size:1rem}
+.stats{display:flex;gap:28px;flex-wrap:wrap;font-family:var(--mono);font-size:.8rem;color:var(--muted)}
+.stats b{display:block;font-size:1.5rem;color:var(--fg);font-weight:500}
+#map{width:100%;position:relative;border-block:1px solid var(--line);padding-block:8px}
+#map .datamaps-subunit{fill:var(--land)!important;stroke:var(--bg)!important;stroke-width:.5;cursor:default}
+#map .datamaps-subunit.b1{fill:var(--s1)!important}#map .datamaps-subunit.b2{fill:var(--s2)!important}
+#map .datamaps-subunit.b3{fill:var(--s3)!important}#map .datamaps-subunit.b4{fill:var(--s4)!important}
+#map .datamaps-subunit.b5{fill:var(--s5)!important}
+#map .datamaps-subunit.has{cursor:pointer}
+#map .datamaps-subunit.has:hover{stroke:var(--sel)!important;stroke-width:1.2}
+#map .datamaps-subunit.on{stroke:var(--sel)!important;stroke-width:1.8}
+.legend{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:.75rem;color:var(--muted)}
+.legend i{width:26px;height:10px;display:inline-block}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.2fr);gap:32px}
+@media(max-width:760px){.cols{grid-template-columns:minmax(0,1fr)}}
+h2{font-family:var(--display);font-size:1.15rem;margin:0 0 12px;font-weight:500}
+.rank{display:flex;flex-direction:column;gap:2px;max-height:520px;overflow-y:auto}
+.rank button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:7.5rem minmax(0,1fr) 2rem;gap:10px;align-items:center;padding:5px 8px;cursor:pointer;border-radius:3px}
+.rank button:hover{background:var(--panel)}
+.rank button:focus-visible{outline:2px solid var(--sel)}
+.rank button[aria-pressed="true"]{background:var(--panel);outline:1px solid var(--line)}
+.rank .bar{height:8px;background:var(--s3);min-width:2px}
+.rank .n{font-family:var(--mono);font-size:.8rem;text-align:right;font-variant-numeric:tabular-nums}
+.detail{background:var(--panel);padding:20px;min-width:0}
+.detail h3{font-family:var(--display);font-size:1.6rem;margin:0 0 4px;font-weight:700}
+.detail p{margin:0 0 14px;color:var(--muted);font-size:.9rem}
+.dishes{display:flex;flex-wrap:wrap;gap:6px}
+.dishes span{border:1px solid var(--line);background:var(--bg);padding:3px 9px;font-size:.88rem}
+.note{font-size:.8rem;color:var(--muted);max-width:70ch}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Yemek Haritam</h1>
+    <p class="sub">Notion'daki yemek listesi, mutfağın geldiği ülkeye göre. Ülkesi belli olan yemekler sayılır; genel tarifler (çoğu salata ve sebze yemeği) haritaya girmez.</p>
+  </header>
+  <div class="stats" id="stats"></div>
+  <div id="map" aria-label="Ülkelere göre yemek haritası"></div>
+  <div class="legend" id="legend"></div>
+  <div class="cols">
+    <section><h2>Ülkeler</h2><div class="rank" id="rank"></div></section>
+    <section class="detail" aria-live="polite" id="detail"></section>
+  </div>
+  <p class="note">Ülke eşlemesi yemeğin adına ve bilinen kökenine göre yapıldı; Notion'da ülke alanı yok. Tartışmalı kökenler (falafel, şavurma, kombucha) en yaygın kabul edilen ülkeye yazıldı veya dışarıda bırakıldı.</p>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.17/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/1.6.9/topojson.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/datamaps/0.5.9/datamaps.world.min.js"></script>
+<script>
+var NAMES={TUR:'Türkiye',ITA:'İtalya',FIN:'Finlandiya',GRC:'Yunanistan',MEX:'Meksika',JPN:'Japonya',FRA:'Fransa',USA:'ABD',LBN:'Lübnan',ESP:'İspanya',CHN:'Çin',EGY:'Mısır',GEO:'Gürcistan',DEU:'Almanya',IND:'Hindistan',GBR:'Birleşik Krallık',CYP:'Kıbrıs',SYR:'Suriye',ARM:'Ermenistan',SWE:'İsveç',RUS:'Rusya',VNM:'Vietnam',CHE:'İsviçre',UKR:'Ukrayna',MAR:'Fas',CUB:'Küba'};
+var D={
+TUR:['Çılbır','Yoğurtlu semiz otu salatası','Mantı (hazır)','İzmir bomba tatlısı','Kuru Fasulye','Barbunya yemeği','Mercimekli erişte','Nohut yemeği','Pirinç pilavı','Yulaf Pilavı','Bulgur','Karalahanalı nohut','Yeşil Mercimek Yemeği','Soğan turşusu','Kırmızı lahana turşusu','Ispanaklı pide','Lahmacun (vegan)','Sebzeli börek','Gözleme: Pirasa','Kalburabastı','Kek kalıbında peynirli börek','Ispanaklı börek','Simit','Sebzeli bahar böreği','Ispanaklı Poğaça','Bol susamlı poğaça','Menemen','Biber kızartması + yoğurt','Mercimek köftesi','Kabak Mücver','Brokoli Mücver (peynirli)','İçli köfte (hazır)','Fellah köftesi','Vegan içli köfte','Topalak','Patlıcan salatası','Pazı kavurma','Fava','Yoğurtlu cevizli kabak','Cevizli yoğurtlu kereviz','Kurutulmuş biber sote + yoğurt','Atom','Karpuz & peynir & zeytin & kızarmış ekmek','Vegan iskender','Mantar Kokoreç','Kısır','Börülce salatası','Tarator sos','Yoğurt-tahin sos','Revani','Kabak tatlısı','İrmik helvası','Sütlac','Kestaneli yaş pasta','Sütlü incir tatlısı','Ayva Tatlısı','Doldurulmuş kabaklar','Bezelye yemeği','Lahana sarması','Enginar sote','Ispanak yemeği','Kuru bamya yemeği','Portakallı kerevizli pırasa','Vişneli yaprak sarma','Kurutulmuş taze fasülye','Kuru patlıcan yemeği','Patlıcan Çığırtma','Kapuska','Kabak dolmasi','Sarma','Taze fasulye','Zeytinyağlı biber dolması','Patatesli, domatesli ve yeşil fasülyeli kavurma','Türlü','Zeytinyağlı bamya','Isırgan kavurma','Kuru barbunya pilaki','Kuru dolma','Enginar dolması','Karnıyarık','Mercimek çorbası','Baharatlı Mercimek Çorbası','Yayla çorbası','Soğuk ayran aşı çorbası','Tarhana Çorbası','Sübye (rakılı)'],
+ITA:['Suppli','Fig, Pear, Walnut, Brie, Honey and Goat Cheese Pizza','Mantar & Ispanak Risotto','Spagetti bolognese','Garlic butter shrimp pasta','Pancarlı risotto','Spaghetti with rucola and lemon zest','Oat risotto','Pesto soslu makarna','Dried Mushrooms (Oat) Risotto','Pumpkin Pasta with Spinach','Polenta','Roasted puttanesca sauce with polenta','Yeşillikli Polenta','Patlıcanlı makarna','Risotto: kale/zucchini','Enginarlı risotto','Ravioli','Mushroom risotto (Kanterelli)','Biberiyeli mantar soslu spaghetti','Mantarlı makarna','Alfredo soslu makarna','Spinach Parmesan Risotto','Classic risotto recipe','Keçi peynirli penne','Asparagus risotto','Parmesan peynirli rezene','Limonlu pizza','Pizza Margarita','Modern Pizza Margarita','Ispanaklı lazanya','Lazanya: Vegan kıyma & havuç','Patlıcanlı Pizza','Lazanya: patlıcan domates','Lazanya: kabak havuç','Keçi peynirli kuru kayısılı pizza','Melanzane Lasagne','Ananaslı Aura peynirli pizza','Enginarlı mozarellalı sarımsaklı pizza','Bruschetta','Caprese salad','Carpaccio kabak','Pesto alla Trapanese'],
+FIN:['Siemennäkkileipä','Rahkapulla','Mercimekli salata (ranskalainen sosla)','Sima','Kotikalja','Pinaattinen kirjolohi-perunasoselaatikko','Lanttulaatikko','Perunalaatikko','Riisipiirakka & munavoi','Kuuma koira (hot dog)','Ranskalainen sos','Kahveli pudding (kahvivanukas)','Mustikka-rahkapiiras','Pannukakku','Åland pancake','Banaanisuklaamaapähkinäleivos','Mustikkajuustokakku lasissa','Yogurtti mustikkapiirakka','Şalgam çorbası (naurissosekeitto)','Lanttulaatikkokeitto','Kasvis-chowder','Long Drink Grapefruit'],
+GRC:['Greek Moussaka','Fırında kabak (yunan usulü)','Grilled eggplant and zucchini with tzatziki','Greek tomato keftedes','Tszaciki (caciki)','Roasted Greek Salad with Roasted Peppers','Dakos salatası'],
+MEX:['Meksika fasulyesi (enchilada/casserole)','Mexican pizza','Casserole: Tex mex','Guacamole (cips ile)','Huaraches with Black Beans and Radish','Vegetarian Enchilada','Taco'],
+JPN:['Miso Ginger Soba Noodles','Japanese curry','Sesame soba noodles','Sebze tempura','Bamya tempura','Bamya tempura (2)','Sushi (hazır)'],
+FRA:['Brokoli & Havuç & kapya biber kişi','Kuşkonmazlı kiş','Sebzeli Kiş','Kabaklı pırasalı graten','Brie and pear tart','Krep','Hollandise sos','Beşamel sos','Creme caramel (flan)'],
+USA:['Chocolate Covered Snickers Stuffed Dates','Blueberry pancakes','Çikolata parçacıklı brownie','Blueberry oat muffins','Banana bread','Chiffon Cake','Bagel','Vegan burger','Sweet potato chowder','Enginar Midye Chowder'],
+LBN:['Chickpea shawarma','Tabbouleh','Chickpea fattoush','Pumpkin kibbeh','Baba ganoush wrap','Sfouf (turmeric cake)'],
+ESP:['Karides ve midye paella','Potaje de Garbanzos','Gazpacho','San Sebastian cheesecake','Keçi peynirli pintxos'],
+CHN:['Hot pot','Çin Mantısı / Chinese Dumplings','Wonton soup','Sebzeli spring roll','Baijiu cocktail'],
+EGY:['Mercimekli (filizli) Falafel','Falafel wrap','Falafel salata'],
+GEO:['Lobio (Kırmızı fasülye)','Badrijani'],
+DEU:['Sauerkraut','Lebkuchen','Vöner'],
+IND:['Haldi Ka Doodh','Dhaba style Matar Paneer'],
+GBR:['Scrambled eggs (Gordon Ramsay style)','Porridge'],
+CYP:['Hellim, kabak, domates (şiş)','Halloumi with sesame and honey'],
+SYR:['Muhammara'],ARM:['Topik'],SWE:['Toast skagen'],RUS:['Blini (mantar krep)'],VNM:['Vietnam usulü balıklı pirinç noodle'],CHE:['Sebze Fondü'],UKR:['Ukranya Borç Çorbası'],MAR:['Moroccan spiced roasted carrots'],CUB:['Mojito']
+};
+var keys=Object.keys(D).sort(function(a,b){return D[b].length-D[a].length});
+var max=D[keys[0]].length, total=keys.reduce(function(s,k){return s+D[k].length},0);
+function bucket(n){return n>=60?5:n>=30?4:n>=10?3:n>=4?2:1}
+document.getElementById('stats').innerHTML='<div><b>'+total+'</b>ülkesi belli yemek</div><div><b>'+keys.length+'</b>ülke</div><div><b>'+NAMES[keys[0]]+'</b>en çok</div>';
+document.getElementById('legend').innerHTML='1–3 <i style="background:var(--s1)"></i><i style="background:var(--s2)"></i><i style="background:var(--s3)"></i><i style="background:var(--s4)"></i><i style="background:var(--s5)"></i> 60+ yemek';
+
+var sel=null;
+function show(k){
+  sel=k;
+  var d=document.getElementById('detail');
+  d.innerHTML='<h3>'+NAMES[k]+'</h3><p>'+D[k].length+' yemek</p><div class="dishes">'+D[k].map(function(x){return '<span>'+x.replace(/</g,'&lt;')+'</span>'}).join('')+'</div>';
+  [].forEach.call(document.querySelectorAll('.rank button'),function(b){b.setAttribute('aria-pressed',b.dataset.k===k)});
+  [].forEach.call(document.querySelectorAll('#map .datamaps-subunit'),function(p){p.classList.toggle('on',p.classList.contains(k))});
+}
+var rank=document.getElementById('rank');
+keys.forEach(function(k){
+  var b=document.createElement('button');b.dataset.k=k;b.setAttribute('aria-pressed','false');
+  b.innerHTML='<span>'+NAMES[k]+'</span><span><div class="bar" style="width:'+Math.max(2,D[k].length/max*100)+'%"></div></span><span class="n">'+D[k].length+'</span>';
+  b.onclick=function(){show(k)};rank.appendChild(b);
+});
+
+var map=new Datamap({
+  element:document.getElementById('map'),responsive:true,projection:'mercator',
+  setProjection:function(el){var p=d3.geo.mercator().center([15,38]).scale(el.offsetWidth/6.2).translate([el.offsetWidth/2,(el.offsetHeight||el.offsetWidth*0.56)/2]);return{path:d3.geo.path().projection(p),projection:p}},
+  geographyConfig:{popupOnHover:false,highlightOnHover:false,borderWidth:.5},
+  fills:{defaultFill:'#999'}
+});
+keys.forEach(function(k){
+  var p=document.querySelector('#map .datamaps-subunit.'+k);
+  if(p){p.classList.add('b'+bucket(D[k].length),'has');p.addEventListener('click',function(){show(k)});
+    var t=document.createElementNS('http://www.w3.org/2000/svg','title');t.textContent=NAMES[k]+': '+D[k].length;p.appendChild(t)}
+});
+window.addEventListener('resize',function(){map.resize()});
+show(keys[0]);
+</script>
+</body>
+</html>
